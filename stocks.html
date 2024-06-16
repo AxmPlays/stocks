@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stocks Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color, #f9f9f9);
+            color: var(--text-color, #333);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            padding: 20px;
+            background-color: var(--container-bg-color, #fff);
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .controls label {
+            font-weight: bold;
+        }
+
+        .controls input[type="number"],
+        .controls button {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+
+        .summary {
+            margin-bottom: 20px;
+        }
+
+        .summary h2 {
+            margin-bottom: 10px;
+        }
+
+        .summary p {
+            margin: 5px 0;
+        }
+
+        .jobs {
+            margin-bottom: 20px;
+        }
+
+        .jobs h2 {
+            margin-bottom: 10px;
+        }
+
+        .job-item {
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: var(--job-bg-color, #f0f0f0);
+            border-radius: 5px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .job-item span {
+            margin-right: 10px;
+            flex: 1;
+        }
+
+        .job-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .job-buttons button {
+            flex: 1;
+        }
+
+        .stocks {
+            margin-bottom: 20px;
+        }
+
+        .stocks h2 {
+            margin-bottom: 10px;
+        }
+
+        #stocksList {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .stock-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: var(--stock-bg-color, #f0f0f0);
+            border-radius: 5px;
+            width: 100%;
+        }
+
+        .stock-item span {
+            margin-right: 10px;
+            flex: 1; /* Ensure the stock name spans flexibly */
+        }
+
+        .stock-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .stock-buttons button {
+            flex: 1; /* Distribute buttons evenly */
+        }
+
+        .chart {
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        .dark-theme {
+            --bg-color: #333;
+            --text-color: #fff;
+            --container-bg-color: #444;
+            --stock-bg-color: #555;
+            --job-bg-color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stocks & Jobs Simulator</h1>
+
+        <div class="controls">
+            <label for="budget">Budget:</label>
+            <input type="number" id="budget" value="10000" onchange="setBudget()">
+            <button onclick="addStock()">Add Stock</button>
+            <button id="simulationButton" onclick="toggleSimulation()">Start Simulation</button>
+            <button onclick="toggleTheme()">Toggle Theme</button>
+        </div>
+
+        <div class="summary">
+            <h2>Summary</h2>
+            <p>Net Worth: $<span id="netWorth">0.00</span></p>
+            <p>Remaining Balance: $<span id="remainingBalance">10000.00</span></p>
+            <ul id="ownedStocks"></ul>
+        </div>
+
+        <div class="jobs">
+            <h2>Jobs</h2>
+            <div id="jobsList"></div>
+        </div>
+
+        <div class="stocks">
+            <h2>Stocks</h2>
+            <div id="stocksList"></div>
+            <select id="stockSelector" onchange="updateChart()">
+                <option value="">Select a stock to view</option>
+            </select>
+        </div>
+
+        <div class="chart">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let stocks = [];
+        let jobs = [
+            { name: "Delivery", pay: 20, timeRequired: 2, cooldown: 0 },
+            { name: "Tutoring", pay: 30, timeRequired: 3, cooldown: 0 },
+            { name: "Freelance Coding", pay: 50, timeRequired: 5, cooldown: 0 }
+        ];
+        let budget = 10000;
+        let simulationInterval;
+        let simulationRunning = false;
+        let chart;
+
+        function setBudget() {
+            budget = parseFloat(document.getElementById('budget').value);
+            document.getElementById('remainingBalance').textContent = budget.toFixed(2);
+        }
+
+        function addStock() {
+            const stockName = prompt("Enter stock name:");
+            if (!stockName) return;
+            const isCheap = Math.random() < 0.5;  // 50% chance for a stock to be cheap
+            stocks.push({
+                name: stockName,
+                prices: generatePrices(isCheap),
+                owned: 0,
+                color: generateRandomColor()
+            });
+            updateStocksList();
+            updateStockSelector();
+        }
+
+        function generateRandomColor() {
+            return '#' + Math.floor(Math.random() * 16777215).toString(16);
+        }
+
+        function generatePrices(isCheap) {
+    const prices = [];
+    let currentPrice = isCheap ? Math.random() * 98 + 2 : Math.random() * 1000 + 500;
+    for (let i = 0; i < 50; i++) {
+        let priceChange = (Math.random() - 0.5) * 40 + (currentPrice * 0.01); // Increase range of priceChange
+        if (Math.random() < 0.2) { // Increase chance of a big change to 20%
+            priceChange *= (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 10 + 1); // Increase variability
+        }
+        // Introduce a 10% chance of a drastic drop (more than 50% loss)
+        if (Math.random() < 0.1) {
+            priceChange = -0.5 * currentPrice;
+        }
+        currentPrice += priceChange;
+        currentPrice = Math.max(currentPrice, 2); // Ensure price is not less than $2
+        prices.push(currentPrice);
+    }
+    return prices;
+}
+
+
+
+        function updateStocksList() {
+            const stocksList = document.getElementById('stocksList');
+            stocksList.innerHTML = '';
+            stocks.forEach((stock, index) => {
+                const stockItem = document.createElement('div');
+                stockItem.classList.add('stock-item');
+                stockItem.innerHTML = `
+                    <span>${stock.name}: $${stock.prices[stock.prices.length - 1].toFixed(2)}</span>
+                    <div class="stock-buttons">
+                        <button onclick="buyStock(${index})">Buy</button>
+                        <button onclick="sellStock(${index})">Sell</button>
+                    </div>
+                `;
+                stocksList.appendChild(stockItem);
+            });
+        }
+
+        function updateStockSelector() {
+            const stockSelector = document.getElementById('stockSelector');
+            stockSelector.innerHTML = '<option value="">Select a stock to view</option>';
+            stocks.forEach((stock, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = stock.name;
+                stockSelector.appendChild(option);
+            });
+        }
+
+        function updateChart() {
+            const stockSelector = document.getElementById('stockSelector');
+            const selectedIndex = stockSelector.value;
+            if (selectedIndex === "") return;
+
+            const selectedStock = stocks[selectedIndex];
+            const labels = Array.from(Array(selectedStock.prices.length).keys()).map(i => `Time ${i}`);
+            const datasets = [{
+                label:
+                selectedStock.name,
+                data: selectedStock.prices,
+                borderColor: selectedStock.color,
+                fill: false
+            }];
+
+            if (!chart) {
+                const ctx = document.getElementById('myChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets,
+                    },
+                    options: {
+                        animation: false, // Disable animations
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                chart.data.labels = labels;
+                chart.data.datasets = datasets;
+                chart.update();
+            }
+        }
+
+        function toggleSimulation() {
+            if (simulationRunning) {
+                clearInterval(simulationInterval);
+                document.getElementById('simulationButton').textContent = 'Start Simulation';
+            } else {
+                simulationInterval = setInterval(updateSimulation, 1000);
+                document.getElementById('simulationButton').textContent = 'Stop Simulation';
+            }
+            simulationRunning = !simulationRunning;
+        }
+
+        function updateSimulation() {
+            // Update stocks prices
+            stocks.forEach(stock => {
+                const lastPrice = stock.prices[stock.prices.length - 1];
+                let priceChange = (Math.random() - 0.5) * 20 + (lastPrice * 0.01);
+                if (Math.random() < 0.1) {  // 10% chance of a big change
+                    priceChange *= (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 5 + 1); // Increase variability
+                }
+                // Introduce a 5% chance of a drastic drop (more than 50% loss)
+                if (Math.random() < 0.05) {
+                    priceChange = -0.5 * lastPrice;
+                }
+                const newPrice = lastPrice + priceChange;
+                stock.prices.push(Math.max(newPrice, 0));
+            });
+
+            // Update job listings (randomize pay)
+            updateJobs();
+
+            // Update UI
+            updateStocksList();
+            updateSummary();
+            const stockSelector = document.getElementById('stockSelector');
+            if (stockSelector.value !== "") {
+                updateChart();
+            }
+        }
+
+        function updateJobs() {
+            jobs.forEach(job => {
+                if (job.cooldown > 0) {
+                    job.cooldown--;
+                }
+            });
+            const jobsList = document.getElementById('jobsList');
+            jobsList.innerHTML = '';
+            jobs.forEach((job, index) => {
+                const jobItem = document.createElement('div');
+                jobItem.classList.add('job-item');
+                jobItem.innerHTML = `
+                    <span>${job.name}: Earn $${job.pay.toFixed(2)} for ${job.timeRequired} hours</span>
+                    <div class="job-buttons">
+                        <button ${job.cooldown > 0 ? 'disabled' : ''} onclick="takeJob(${index})">Take Job</button>
+                    </div>
+                `;
+                jobsList.appendChild(jobItem);
+            });
+        }
+
+        function takeJob(index) {
+            const job = jobs[index];
+            const earned = job.pay;
+            budget += earned;
+            document.getElementById('remainingBalance').textContent = budget.toFixed(2);
+            job.cooldown = 5; // Cooldown period (in seconds)
+            updateJobs();
+            updateSummary();
+        }
+
+        function buyStock(index) {
+            const stock = stocks[index];
+            const stockPrice = stock.prices[stock.prices.length - 1];
+            if (budget >= stockPrice) {
+                budget -= stockPrice;
+                stock.owned += 1;
+                updateStocksList();
+                updateSummary();
+            } else {
+                alert(`Insufficient budget to buy ${stock.name}.`);
+            }
+        }
+
+        function sellStock(index) {
+            const stock = stocks[index];
+            if (stock.owned > 0) {
+                const stockPrice = stock.prices[stock.prices.length - 1];
+                budget += stockPrice;
+                stock.owned -= 1;
+                updateStocksList();
+                updateSummary();
+            } else {
+                alert(`You don't own any ${stock.name} to sell.`);
+            }
+        }
+
+        function updateSummary() {
+            let netWorth = 0;
+            stocks.forEach(stock => {
+                const currentPrice = stock.prices[stock.prices.length - 1];
+                netWorth += currentPrice * stock.owned;
+            });
+
+            const remainingBalance = budget;
+            const totalNetWorth = netWorth + remainingBalance;
+
+            document.getElementById('netWorth').textContent = totalNetWorth.toFixed(2);
+            document.getElementById('remainingBalance').textContent = remainingBalance.toFixed(2);
+
+            const ownedStocksList = document.getElementById('ownedStocks');
+            ownedStocksList.innerHTML = '';
+            stocks.filter(stock => stock.owned > 0).forEach(stock => {
+                const li = document.createElement('li');
+                li.textContent = `${stock.name}: ${stock.owned} shares`;
+                ownedStocksList.appendChild(li);
+            });
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            stocks.forEach(stock => {
+                stock.color = generateRandomColor();
+            });
+            updateChart();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setBudget();
+            updateStocksList();
+            updateStockSelector();
+            updateJobs(); // Initialize jobs list
+        });
+    </script>
+</body>
+</html>
