@@ -282,12 +282,10 @@
             const stockSelector = document.getElementById('stockSelector');
             const selectedIndex = stockSelector.value;
             if (selectedIndex === "") return;
-
             const selectedStock = stocks[selectedIndex];
             const labels = Array.from(Array(selectedStock.prices.length).keys()).map(i => `Time ${i}`);
             const datasets = [{
-                label:
-                selectedStock.name,
+                label: selectedStock.name,
                 data: selectedStock.prices,
                 borderColor: selectedStock.color,
                 fill: false
@@ -390,13 +388,17 @@
         function buyStock(index) {
             const stock = stocks[index];
             const stockPrice = stock.prices[stock.prices.length - 1];
-            if (budget >= stockPrice) {
-                budget -= stockPrice;
-                stock.owned += 1;
+            const sharesToBuy = prompt(`Enter the number of shares you want to buy for ${stock.name}:`);
+            if (sharesToBuy === null || sharesToBuy === '') return;
+
+            const totalCost = stockPrice * parseFloat(sharesToBuy);
+            if (budget >= totalCost) {
+                budget -= totalCost;
+                stock.owned += parseFloat(sharesToBuy);
                 updateStocksList();
                 updateSummary();
             } else {
-                alert(`Insufficient budget to buy ${stock.name}.`);
+                alert(`Insufficient budget to buy ${sharesToBuy} shares of ${stock.name}.`);
             }
         }
 
@@ -404,10 +406,18 @@
             const stock = stocks[index];
             if (stock.owned > 0) {
                 const stockPrice = stock.prices[stock.prices.length - 1];
-                budget += stockPrice;
-                stock.owned -= 1;
-                updateStocksList();
-                updateSummary();
+                const sharesToSell = prompt(`Enter the number of shares you want to sell for ${stock.name}:`);
+                if (sharesToSell === null || sharesToSell === '') return;
+
+                if (parseFloat(sharesToSell) <= stock.owned) {
+                    const totalEarned = stockPrice * parseFloat(sharesToSell);
+                    budget += totalEarned;
+                    stock.owned -= parseFloat(sharesToSell);
+                    updateStocksList();
+                    updateSummary();
+                } else {
+                    alert(`You don't own ${sharesToSell} shares of ${stock.name} to sell.`);
+                }
             } else {
                 alert(`You don't own any ${stock.name} to sell.`);
             }
