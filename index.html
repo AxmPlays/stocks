@@ -147,6 +147,25 @@
             margin-bottom: 20px;
         }
 
+        .save-load-buttons {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .save-load-buttons button {
+            padding: 10px;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .save-load-buttons button:hover {
+            background-color: #218838;
+        }
+
         .dark-theme {
             --bg-color: #333;
             --text-color: #fff;
@@ -191,6 +210,15 @@
         <div class="chart">
             <canvas id="myChart"></canvas>
         </div>
+
+        <div class="save-load-buttons">
+            <button onclick="saveToSlot(1)">Save to Slot 1</button>
+            <button onclick="saveToSlot(2)">Save to Slot 2</button>
+            <button onclick="saveToSlot(3)">Save to Slot 3</button>
+            <button onclick="loadFromSlot(1)">Load from Slot 1</button>
+            <button onclick="loadFromSlot(2)">Load from Slot 2</button>
+            <button onclick="loadFromSlot(3)">Load from Slot 3</button>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -209,6 +237,7 @@
         function setBudget() {
             budget = parseFloat(document.getElementById('budget').value);
             document.getElementById('remainingBalance').textContent = budget.toFixed(2);
+            saveToLocalStorage();
         }
 
         function addStock() {
@@ -223,6 +252,7 @@
             });
             updateStocksList();
             updateStockSelector();
+            saveToLocalStorage();
         }
 
         function generateRandomColor() {
@@ -230,25 +260,23 @@
         }
 
         function generatePrices(isCheap) {
-    const prices = [];
-    let currentPrice = isCheap ? Math.random() * 98 + 2 : Math.random() * 1000 + 500;
-    for (let i = 0; i < 50; i++) {
-        let priceChange = (Math.random() - 0.5) * 40 + (currentPrice * 0.01); // Increase range of priceChange
-        if (Math.random() < 0.2) { // Increase chance of a big change to 20%
-            priceChange *= (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 10 + 1); // Increase variability
+            const prices = [];
+            let currentPrice = isCheap ? Math.random() * 98 + 2 : Math.random() * 1000 + 500;
+            for (let i = 0; i < 50; i++) {
+                let priceChange = (Math.random() - 0.5) * 40 + (currentPrice * 0.01); // Increase range of priceChange
+                if (Math.random() < 0.2) { // Increase chance of a big change to 20%
+                    priceChange *= (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 10 + 1); // Increase variability
+                }
+                // Introduce a 10% chance of a drastic drop (more than 50% loss)
+                if (Math.random() < 0.1) {
+                    priceChange = -0.5 * currentPrice;
+                }
+                currentPrice += priceChange;
+                currentPrice = Math.max(currentPrice, 2); // Ensure price is not less than $2
+                prices.push(currentPrice);
+            }
+            return prices;
         }
-        // Introduce a 10% chance of a drastic drop (more than 50% loss)
-        if (Math.random() < 0.1) {
-            priceChange = -0.5 * currentPrice;
-        }
-        currentPrice += priceChange;
-        currentPrice = Math.max(currentPrice, 2); // Ensure price is not less than $2
-        prices.push(currentPrice);
-    }
-    return prices;
-}
-
-
 
         function updateStocksList() {
             const stocksList = document.getElementById('stocksList');
@@ -352,6 +380,8 @@
             if (stockSelector.value !== "") {
                 updateChart();
             }
+
+            saveToLocalStorage();
         }
 
         function updateJobs() {
@@ -383,6 +413,7 @@
             job.cooldown = 5; // Cooldown period (in seconds)
             updateJobs();
             updateSummary();
+            saveToLocalStorage();
         }
 
         function buyStock(index) {
@@ -397,6 +428,7 @@
                 stock.owned += parseFloat(sharesToBuy);
                 updateStocksList();
                 updateSummary();
+                saveToLocalStorage();
             } else {
                 alert(`Insufficient budget to buy ${sharesToBuy} shares of ${stock.name}.`);
             }
@@ -415,6 +447,7 @@
                     stock.owned -= parseFloat(sharesToSell);
                     updateStocksList();
                     updateSummary();
+                    saveToLocalStorage();
                 } else {
                     alert(`You don't own ${sharesToSell} shares of ${stock.name} to sell.`);
                 }
@@ -451,13 +484,50 @@
                 stock.color = generateRandomColor();
             });
             updateChart();
+            saveToLocalStorage();
+        }
+
+        function saveToLocalStorage(slot = 0) {
+            const data = {
+                stocks,
+                budget,
+                theme: document.body.classList.contains('dark-theme')
+            };
+            localStorage.setItem(`stocksSimulatorData${slot}`, JSON.stringify(data));
+        }
+
+        function loadFromLocalStorage(slot = 0) {
+            const data = JSON.parse(localStorage.getItem(`stocksSimulatorData${slot}`));
+            if (data) {
+                stocks = data.stocks;
+                budget = data.budget;
+                if (data.theme) {
+                    document.body.classList.add('dark-theme');
+                } else {
+                    document.body.classList.remove('dark-theme');
+                }
+            }
+            updateStocksList();
+            updateStockSelector();
+            updateJobs();
+            updateSummary();
+        }
+
+        function saveToSlot(slot) {
+            saveToLocalStorage(slot);
+        }
+
+        function loadFromSlot(slot) {
+            loadFromLocalStorage(slot);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            loadFromLocalStorage();
             setBudget();
             updateStocksList();
             updateStockSelector();
             updateJobs(); // Initialize jobs list
+            updateSummary(); // Update summary on page load
         });
     </script>
 </body>
